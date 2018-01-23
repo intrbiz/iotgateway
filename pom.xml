@@ -50,33 +50,6 @@
 		</plugins>
 	</build>
 
-	<dependencies>
-		<dependency>
-			<groupId>io.netty</groupId>
-			<artifactId>netty-all</artifactId>
-			<version>4.1.0.CR3</version>
-		</dependency>
-		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.14</version>
-		</dependency>
-		<dependency>
-			<groupId>com.intrbiz.util</groupId>
-			<artifactId>crypto</artifactId>
-			<version>1.1.2-SNAPSHOT</version>
-		</dependency>
-		<dependency>
-			<groupId>com.intrbiz.util</groupId>
-			<artifactId>queue</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<scope>test</scope>
-		</dependency>
-	</dependencies>
-
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -89,7 +62,48 @@
 				<artifactId>junit</artifactId>
 				<version>4.11</version>
 			</dependency>
+			<dependency>
+				<groupId>io.netty</groupId>
+				<artifactId>netty-all</artifactId>
+				<version>4.1.0.CR3</version>
+			</dependency>
+			<dependency>
+				<groupId>log4j</groupId>
+				<artifactId>log4j</artifactId>
+				<version>1.2.14</version>
+			</dependency>
+			<dependency>
+				<groupId>com.intrbiz.util</groupId>
+				<artifactId>crypto</artifactId>
+				<version>1.1.2-SNAPSHOT</version>
+			</dependency>
+			<dependency>
+				<groupId>com.intrbiz.iotgateway</groupId>
+				<artifactId>iotgateway-model</artifactId>
+				<version>${project.version}</version>
+			</dependency>
 		</dependencies>
 	</dependencyManagement>
+    
+    <packaging>pom</packaging>
+    <modules>
+        <module>iotgateway-model</module>
+        <module>iotgateway-server</module>
+    </modules>
+    
+    <repositories>
+        <repository>
+            <id>snapshots</id>
+            <url>http://nexus.intrbiz.net/nexus/content/repositories/snapshots</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>intrbiz</id>
+            <name>Intrbiz</name>
+            <url>http://nexus.intrbiz.net/nexus/content/repositories/releases</url>
+        </repository>
+    </repositories>
 
 </project>
