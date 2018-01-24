@@ -1,8 +1,8 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class FirmwareVerifyChallengeMessage implements DeviceMessage
 {
@@ -15,6 +15,12 @@ public class FirmwareVerifyChallengeMessage implements DeviceMessage
     public FirmwareVerifyChallengeMessage()
     {
         super();
+    }
+    public FirmwareVerifyChallengeMessage(byte[] hash, byte[] nonce)
+    {
+        super();
+        this.hash = hash;
+        this.nonce = nonce;
     }
 
     public byte[] getHash()

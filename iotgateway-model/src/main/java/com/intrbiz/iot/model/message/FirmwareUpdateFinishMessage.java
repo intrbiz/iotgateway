@@ -1,8 +1,8 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class FirmwareUpdateFinishMessage implements DeviceMessage
 {
@@ -13,6 +13,12 @@ public class FirmwareUpdateFinishMessage implements DeviceMessage
     public FirmwareUpdateFinishMessage()
     {
         super();
+    }
+
+    public FirmwareUpdateFinishMessage(byte[] hash)
+    {
+        super();
+        this.hash = hash;
     }
 
     public byte[] getHash()

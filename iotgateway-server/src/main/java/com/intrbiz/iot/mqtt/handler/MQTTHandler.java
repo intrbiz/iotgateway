@@ -6,9 +6,13 @@ import java.util.UUID;
 import org.apache.log4j.Logger;
 
 import com.intrbiz.iot.engine.DeviceAuthenticationEngine;
+import com.intrbiz.iot.engine.FirmwareEngine;
 import com.intrbiz.iot.engine.QueueEngine;
+import com.intrbiz.iot.engine.firmware.FirmwareContext;
 import com.intrbiz.iot.engine.queue.QueueContext;
 import com.intrbiz.iot.model.SessionKey;
+import com.intrbiz.iot.mqtt.processor.MQTTProcessingChain;
+import com.intrbiz.iot.mqtt.processor.MQTTProcessorContext;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,8 +37,10 @@ import io.netty.handler.codec.mqtt.MqttTopicSubscription;
  * devices and encryption of message payloads.
  *
  */
-public class MQTTHandler extends ChannelInboundHandlerAdapter
+public class MQTTHandler extends ChannelInboundHandlerAdapter implements MQTTProcessorContext
 {
+    private static Logger logger = Logger.getLogger(MQTTHandler.class);
+    
     /**
      * Authentication timeout in nanoseconds
      */
@@ -54,11 +60,19 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         DISCONNECTED
     }
     
+    // processing chain
+    
+    private final MQTTProcessingChain processingChain;
+    
+    // engines
+    
     private final DeviceAuthenticationEngine authenticationEngine;
     
     private final QueueEngine queue;
     
-    private Logger logger = Logger.getLogger(MQTTHandler.class);
+    private final FirmwareEngine firmware;
+    
+    // state
     
     private UUID clientId;
     
@@ -76,18 +90,71 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
     
     private byte[] sessionKey;
     
+    // context
+    
     private QueueContext queueContext;
+    
+    private FirmwareContext fimrwareContext;
+    
+    // the connection
+    
+    private ChannelHandlerContext context;
 
-    public MQTTHandler(DeviceAuthenticationEngine authenticationEngine, QueueEngine queue)
+    public MQTTHandler(DeviceAuthenticationEngine authenticationEngine, QueueEngine queue, FirmwareEngine engine, MQTTProcessingChain processingChain)
     {
         super();
         this.authenticationEngine = authenticationEngine;
         this.queue = queue;
+        this.firmware = engine;
+        this.processingChain = processingChain;
+    }
+    
+    @Override
+    public QueueEngine queueEngine()
+    {
+        return this.queue;
+    }
+    
+    @Override
+    public FirmwareEngine firmwareEngine()
+    {
+        return this.firmware;
+    }
+    
+    @Override
+    public DeviceAuthenticationEngine authenticationEngine()
+    {
+        return this.authenticationEngine;
+    }
+    
+    @Override
+    public QueueContext queue()
+    {
+        return this.queueContext;
+    }
+    
+    @Override
+    public FirmwareContext firmware()
+    {
+        return this.fimrwareContext;
+    }
+
+    @Override
+    public UUID clientId()
+    {
+        return this.clientId;
+    }
+
+    @Override
+    public ClientState state()
+    {
+        return this.state;
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception
     {
+        this.context = ctx;
         logger.info("Got connection, from: " + ctx.channel().remoteAddress());
     }
 
@@ -96,6 +163,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
     {
         // close any queue subscriptions
         if (this.queueContext != null) this.queueContext.close();
+        if (this.fimrwareContext != null) this.fimrwareContext.close();
         logger.info("Closed connection, from: " + ctx.channel().remoteAddress());
     }
 
@@ -223,6 +291,19 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         }
     }
     
+    @Override
+    public void publishMessage(String topic, byte[] plainText)
+    {
+        try
+        {
+            this.publishMessageToClient(this.context, topic, plainText);
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException("Failed to publish message to client", e);
+        }
+    }
+    
     private void publishMessageToClient(ChannelHandlerContext ctx, String topic, byte[] plainText) throws Exception
     {
         if (this.state == ClientState.AUTHENTICATED)
@@ -249,11 +330,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         message.content().readBytes(encrypted);
         // decrypt the message
         byte[] plainText = this.authenticationEngine.decryptMessage(this.sessionKey, encrypted);
-        // publish
-        String topic = message.variableHeader().topicName();
-        logger.info("Got message: " + topic + " with " + Arrays.toString(plainText) + " " + new String(plainText) + " " + message.fixedHeader().qosLevel() + " from " + this.clientId + " id " + message.variableHeader().messageId() + " qos " + message.fixedHeader().qosLevel());
-        this.queueContext.publish(topic, plainText);
-        // TODO: QOS handling - make this better
+        // ACK the message, TODO: handle QoS better, for now just ignore it
         if (message.fixedHeader().qosLevel() == MqttQoS.AT_LEAST_ONCE)
         {
             ctx.writeAndFlush(new MqttPubAckMessage(new MqttFixedHeader(MqttMessageType.PUBACK, false, MqttQoS.AT_MOST_ONCE, false, 0), MqttMessageIdVariableHeader.from(message.variableHeader().messageId())));
@@ -262,6 +339,10 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         {
             ctx.writeAndFlush(new MqttPubAckMessage(new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.AT_MOST_ONCE, false, 0), MqttMessageIdVariableHeader.from(message.variableHeader().messageId())));
         }
+        // dispatch the message
+        String topic = message.variableHeader().topicName();
+        if (logger.isDebugEnabled()) logger.debug("Got message: " + topic + " with " + Arrays.toString(plainText) + " " + new String(plainText) + " " + message.fixedHeader().qosLevel() + " from " + this.clientId + " id " + message.variableHeader().messageId() + " qos " + message.fixedHeader().qosLevel());
+        this.processingChain.process(this, topic, plainText);
     }
     
     private void processUnauthenticatedPublish(ChannelHandlerContext ctx, MqttPublishMessage message) throws Exception
@@ -279,7 +360,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         else
         {
             // reject
-            logger.info("Got publish from client whilst in illegal state, closing");
+            logger.debug("Got publish from client whilst in illegal state, closing");
             ctx.close();
         }
     }
@@ -287,7 +368,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
     private void processRegistration(ChannelHandlerContext ctx, MqttPublishMessage message) throws Exception
     {
         String topic = message.variableHeader().topicName();
-        logger.info("Processing registration message: " + topic);
+        logger.debug("Processing registration message: " + topic);
         if ("/v1/register/challenge".equals(topic))
         {
             // copy the keyId
@@ -305,14 +386,14 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
                     new MqttPublishVariableHeader("/v1/register/response", 0),
                     Unpooled.wrappedBuffer(this.regChallenge)
             ));
-            logger.info("Published registration challenge");
+            logger.debug("Published registration challenge");
         }
         else if ("/v1/register/complete".equalsIgnoreCase(topic) && this.state == ClientState.REGISTERING)
         {
             // copy the response
             byte[] response = new byte[message.content().readableBytes()];
             message.content().readBytes(response);
-            logger.info("Completing registration of client " + this.clientId + " using key " + this.regKeyId + " response = " + Arrays.toString(response));
+            logger.debug("Completing registration of client " + this.clientId + " using key " + this.regKeyId + " response = " + Arrays.toString(response));
             // verify
             if (((System.nanoTime() - this.regStart) < AUTHENTICATION_TIMEOUT) && this.authenticationEngine.checkDeviceRegistrationResponse(this.clientId, this.regKeyId, this.regChallenge, response))
             {
@@ -351,7 +432,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
     {
         // process our custom auth protocol
         String topic = message.variableHeader().topicName();
-        logger.info("Processing authentication message: " + topic);
+        logger.debug("Processing authentication message: " + topic);
         if ("/v1/auth/challenge".equals(topic))
         {
             byte[] clientNonce = new byte[16];
@@ -361,7 +442,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
             this.authChallenge = this.authenticationEngine.generateDeviceAuthenticationChallenge(this.clientId, clientNonce);
             if (this.authChallenge != null)
             {
-                logger.info("Generated auth challenge: " + Arrays.toString(this.authChallenge));
+                logger.debug("Generated auth challenge: " + Arrays.toString(this.authChallenge));
                 this.authStart = System.nanoTime();
                 this.state = ClientState.AUTHENTICATING;
                 // publish the random token to the client, which it must sign
@@ -374,7 +455,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
             else
             {
                 // authentication failed
-                logger.info("Failed to authenticate device " + this.clientId);
+                logger.debug("Failed to authenticate device " + this.clientId);
                 this.state = ClientState.CONNECTED;
                 this.authChallenge = null;
                 this.authStart = 0;
@@ -393,7 +474,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
             // copy the response
             byte[] response = new byte[message.content().readableBytes()];
             message.content().readBytes(response);
-            logger.info("Verifying client " + this.clientId + " " + Arrays.toString(response) + " [" + response.length + "], auth time: " + (System.nanoTime() - this.authStart));
+            logger.debug("Verifying client " + this.clientId + " " + Arrays.toString(response) + " [" + response.length + "], auth time: " + (System.nanoTime() - this.authStart));
             // verify
             if (((System.nanoTime() - this.authStart) < AUTHENTICATION_TIMEOUT) && this.authenticationEngine.checkDeviceAuthenticationResponse(this.clientId, this.authChallenge, response))
             {
@@ -405,8 +486,9 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
                 // assign the session key
                 SessionKey theSessionKey = this.authenticationEngine.generateSessionKey(this.clientId);
                 this.sessionKey = theSessionKey.getSessionKey();
-                // setup the queue context
+                // setup the our session contexts
                 this.queueContext = this.queue.createContext(this.clientId);
+                if (this.firmware != null) this.fimrwareContext = this.firmware.createContext(this.clientId);
                 // ack the auth
                 ctx.writeAndFlush(new MqttPublishMessage(
                         new MqttFixedHeader(MqttMessageType.PUBLISH, false, MqttQoS.AT_MOST_ONCE, false, 0),
@@ -417,7 +499,7 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
             else
             {
                 // authentication failed
-                logger.info("Failed to authenticate device " + this.clientId);
+                logger.debug("Failed to authenticate device " + this.clientId);
                 this.state = ClientState.CONNECTED;
                 this.authChallenge = null;
                 this.authStart = 0;
@@ -440,7 +522,4 @@ public class MQTTHandler extends ChannelInboundHandlerAdapter
         this.state = ClientState.DISCONNECTED;
         ctx.close();
     }
-    
-    
-
 }

@@ -1,9 +1,11 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
 public class FirmwareUpdateDataMessage implements DeviceMessage
 {
+    public static final int MAX_LENGTH = 1024;
+    
     public static final String TOPIC = "/v2/firmware/update/data";
 
     protected byte[] data;
@@ -11,6 +13,12 @@ public class FirmwareUpdateDataMessage implements DeviceMessage
     public FirmwareUpdateDataMessage()
     {
         super();
+    }
+
+    public FirmwareUpdateDataMessage(byte[] data)
+    {
+        super();
+        this.data = data;
     }
 
     public byte[] getData()

@@ -1,4 +1,4 @@
-package com.intrbiz.connectedkanban.hubserver.util;
+package com.intrbiz.iot.util;
 
 import java.nio.ByteBuffer;
 import java.util.UUID;

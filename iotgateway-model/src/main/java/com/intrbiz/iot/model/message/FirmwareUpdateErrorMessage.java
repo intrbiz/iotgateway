@@ -1,4 +1,4 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
@@ -23,6 +23,12 @@ public class FirmwareUpdateErrorMessage implements DeviceMessage
     public FirmwareUpdateErrorMessage()
     {
         super();
+    }
+    
+    public FirmwareUpdateErrorMessage(byte[] bytes)
+    {
+        super();
+        this.fromBytes(ByteBuffer.wrap(bytes));
     }
 
     public byte getErrorCode()

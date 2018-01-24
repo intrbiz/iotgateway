@@ -17,6 +17,6 @@ public class ExampleGateway
         BasicConfigurator.configure();
         Logger.getRootLogger().setLevel(Level.TRACE);
         QueueManager.getInstance().registerDefaultBroker(new RabbitPool("amqp://127.0.0.1", "mqtt", "mqtt"));
-        new MQTTGateway(1884, new FileDeviceAuthenticationEngine(), new RabbitQueueEngine()).run();
+        new MQTTGateway(1884, new FileDeviceAuthenticationEngine(), new RabbitQueueEngine(), null).run();
     }
 }

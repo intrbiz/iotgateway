@@ -1,8 +1,8 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class FirmwareUpdateBeginMessage implements DeviceMessage
 {
@@ -21,6 +21,15 @@ public class FirmwareUpdateBeginMessage implements DeviceMessage
     public FirmwareUpdateBeginMessage()
     {
         super();
+    }
+
+    public FirmwareUpdateBeginMessage(int firmwareSize, String info, int flags, String md5)
+    {
+        super();
+        this.firmwareSize = firmwareSize;
+        this.info = info;
+        this.flags = flags;
+        this.md5 = md5;
     }
 
     public int getFirmwareSize()

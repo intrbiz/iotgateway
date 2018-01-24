@@ -1,8 +1,8 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class FirmwareVerifyResponseMessage implements DeviceMessage
 {
@@ -13,6 +13,12 @@ public class FirmwareVerifyResponseMessage implements DeviceMessage
     public FirmwareVerifyResponseMessage()
     {
         super();
+    }
+    
+    public FirmwareVerifyResponseMessage(byte[] bytes)
+    {
+        super();
+        this.fromBytes(ByteBuffer.wrap(bytes));
     }
 
     public byte[] getHash()

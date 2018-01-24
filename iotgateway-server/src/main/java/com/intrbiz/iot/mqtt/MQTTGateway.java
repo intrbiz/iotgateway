@@ -3,8 +3,12 @@ package com.intrbiz.iot.mqtt;
 import org.apache.log4j.Logger;
 
 import com.intrbiz.iot.engine.DeviceAuthenticationEngine;
+import com.intrbiz.iot.engine.FirmwareEngine;
 import com.intrbiz.iot.engine.QueueEngine;
 import com.intrbiz.iot.mqtt.handler.MQTTHandler;
+import com.intrbiz.iot.mqtt.processor.MQTTProcessingChain;
+import com.intrbiz.iot.mqtt.processor.impl.FirmwareUpdate;
+import com.intrbiz.iot.mqtt.processor.impl.QueueForward;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -33,12 +37,41 @@ public class MQTTGateway implements Runnable
     
     private final QueueEngine queue;
     
-    public MQTTGateway(int port, DeviceAuthenticationEngine authenticationEngine, QueueEngine queue)
+    private final FirmwareEngine firmware;
+    
+    private final MQTTProcessingChain processingChain;
+    
+    public MQTTGateway(int port, DeviceAuthenticationEngine authenticationEngine, QueueEngine queue, FirmwareEngine firmware)
     {
         super();
         this.port = port;
         this.authenticationEngine = authenticationEngine;
         this.queue = queue;
+        this.firmware = firmware;
+        this.processingChain = new MQTTProcessingChain();
+        // register our default processors and filters
+        this.processingChain.addProcessor(new FirmwareUpdate());
+        this.processingChain.setDefaultProcessor(new QueueForward());
+    }
+    
+    public MQTTProcessingChain processingChain()
+    {
+        return this.processingChain;
+    }
+    
+    public QueueEngine queueEngine()
+    {
+        return this.queue;
+    }
+    
+    public DeviceAuthenticationEngine authenticationEngine()
+    {
+        return this.authenticationEngine;
+    }
+    
+    public FirmwareEngine firmwareEngine()
+    {
+        return this.firmware;
     }
     
     public void run()
@@ -57,7 +90,7 @@ public class MQTTGateway implements Runnable
                 pipeline.addFirst("idleStateHandler", new IdleStateHandler(60, 60, 60));
                 pipeline.addLast("decoder", new MqttDecoder());
                 pipeline.addLast("encoder", new MqttEncoder());
-                pipeline.addLast("handler", new MQTTHandler(MQTTGateway.this.authenticationEngine, MQTTGateway.this.queue));
+                pipeline.addLast("handler", new MQTTHandler(MQTTGateway.this.authenticationEngine, MQTTGateway.this.queue, MQTTGateway.this.firmware, MQTTGateway.this.processingChain));
             }
         }).option(ChannelOption.SO_BACKLOG, 128).option(ChannelOption.SO_REUSEADDR, true).option(ChannelOption.TCP_NODELAY, true).childOption(ChannelOption.SO_KEEPALIVE, true);
         try

@@ -1,12 +1,14 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 import java.util.UUID;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class HelloMessage implements DeviceMessage
 {
+    public static final String TOPIC = "/v1/hello";
+    
     protected UUID deviceId;
 
     protected byte[] localIp = new byte[4];

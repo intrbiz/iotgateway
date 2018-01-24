@@ -1,11 +1,13 @@
-package com.intrbiz.connectedkanban.hubserver.model.message.device;
+package com.intrbiz.iot.model.message;
 
 import java.nio.ByteBuffer;
 
-import com.intrbiz.connectedkanban.hubserver.util.BinUtil;
+import com.intrbiz.iot.util.BinUtil;
 
 public class HelloV2Message extends HelloMessage
-{    
+{   
+    public static final String TOPIC = "/v2/hello";
+    
     protected String appId;
     
     protected byte[] firmwareId;
@@ -15,6 +17,12 @@ public class HelloV2Message extends HelloMessage
     public HelloV2Message()
     {
         super();
+    }
+    
+    public HelloV2Message(byte[] bytes)
+    {
+        this();
+        this.fromBytes(ByteBuffer.wrap(bytes));
     }
     
     public String getAppId()
