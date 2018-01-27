@@ -5,6 +5,11 @@ import java.util.UUID;
 
 public class BinUtil
 {
+    public static UUID parseUUID(byte[] uuid)
+    {
+        return parseUUID(ByteBuffer.wrap(uuid));
+    }
+    
     public static UUID parseUUID(ByteBuffer buffer)
     {
         long msb = buffer.getLong();
@@ -56,6 +61,13 @@ public class BinUtil
         byte[] tmp = str.getBytes();
         buffer.put(tmp, 0, tmp.length <= len ? tmp.length : len);
         if (tmp.length < len) buffer.position(buffer.position() + (len - tmp.length));
+    }
+    
+    public static byte[] writeUUID(UUID id)
+    {
+        byte[] r = new byte[16];
+        writeUUID(ByteBuffer.wrap(r), id);
+        return r;
     }
     
     public static void writeUUID(ByteBuffer buffer, UUID id)

@@ -19,9 +19,13 @@ public interface FirmwareContext
     
     FirmwareUpdateBeginMessage begin();
     
+    boolean isInProgress();
+    
     FirmwareUpdateDataMessage nextChunk(int maxChunkLength);
     
     FirmwareUpdateFinishMessage finish();
+    
+    void complete();
     
     void close();
 }

@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
+import com.intrbiz.iot.model.message.FirmwareUpdateAckMessage;
 import com.intrbiz.iot.model.message.FirmwareUpdateBeginMessage;
 import com.intrbiz.iot.model.message.FirmwareUpdateDataMessage;
 import com.intrbiz.iot.model.message.FirmwareUpdateErrorMessage;
@@ -20,7 +21,7 @@ public class FirmwareUpdate extends AbstractMQTTProcessor
     
     public FirmwareUpdate()
     {
-        super(null, HelloV2Message.TOPIC, FirmwareVerifyResponseMessage.TOPIC, FirmwareUpdateErrorMessage.TOPIC);
+        super(null, HelloV2Message.TOPIC, FirmwareVerifyResponseMessage.TOPIC, FirmwareUpdateErrorMessage.TOPIC, FirmwareUpdateAckMessage.TOPIC);
     }
 
     @Override
@@ -50,18 +51,42 @@ public class FirmwareUpdate extends AbstractMQTTProcessor
                         {
                             logger.info("Begining firmware update for device " + context.clientId() + " to: " + begin.getInfo() + " (" + begin.getMd5() + ")");
                             context.publishMessage(FirmwareUpdateBeginMessage.TOPIC, begin.toBytes());
-                            // send the chunks
-                            FirmwareUpdateDataMessage chunk;
-                            while ((chunk = context.firmware().nextChunk(FirmwareUpdateDataMessage.MAX_LENGTH)) != null)
-                            {
-                                context.publishMessage(FirmwareUpdateDataMessage.TOPIC, chunk.toBytes());
-                            }
-                            // finish the update
-                            FirmwareUpdateFinishMessage finish = context.firmware().finish();
-                            if (finish != null) context.publishMessage(FirmwareUpdateFinishMessage.TOPIC, finish.toBytes());
-                            logger.info("Finished sending firmware to device " + context.clientId());
                         }
                     }
+                    else
+                    {
+                        logger.info("No new firmware for device " + context.clientId());
+                    }
+                }
+            }
+            else if (FirmwareUpdateAckMessage.TOPIC.equals(topic))
+            {
+                FirmwareUpdateAckMessage ack = new FirmwareUpdateAckMessage(message);
+                logger.debug("Firmware update ack from " + context.clientId() + " " + ack.getAck());
+                if (context.firmware().isInProgress() && (ack.isAckBegin() || ack.isAckChunk()))
+                {
+                    // send the next chunk
+                    FirmwareUpdateDataMessage chunk = context.firmware().nextChunk(FirmwareUpdateDataMessage.MAX_LENGTH);
+                    if (chunk != null)
+                    {
+                        logger.debug("Sending firmware chunk to device " + context.clientId());
+                        context.publishMessage(FirmwareUpdateDataMessage.TOPIC, chunk.toBytes());
+                    }
+                    else
+                    {
+                        // finish the update
+                        FirmwareUpdateFinishMessage finish = context.firmware().finish();
+                        if (finish != null)
+                        {
+                            logger.info("Sending finish command to device " + context.clientId());
+                            context.publishMessage(FirmwareUpdateFinishMessage.TOPIC, finish.toBytes());
+                        }
+                    }
+                }
+                else if (context.firmware().isInProgress() && (ack.isAckFinish()))
+                {
+                    context.firmware().complete();
+                    logger.info("Completed firmware update of device " + context.clientId());
                 }
             }
             else if (FirmwareUpdateErrorMessage.TOPIC.equals(topic))

@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import com.intrbiz.iot.engine.FirmwareEngine;
 import com.intrbiz.iot.engine.firmware.FirmwareContext;
-import com.intrbiz.iot.model.Firmware;
+import com.intrbiz.iot.model.DeviceFirmware;
 import com.intrbiz.iot.model.message.FirmwareUpdateBeginMessage;
 import com.intrbiz.iot.model.message.FirmwareUpdateDataMessage;
 import com.intrbiz.iot.model.message.FirmwareUpdateFinishMessage;
@@ -22,7 +22,8 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
         INITIAL,
         CHALLENGED,
         VERIFIED,
-        IN_PROGRESS
+        IN_PROGRESS,
+        COMPLETE;
     }
     
     protected final SecureRandom random = new SecureRandom();
@@ -34,9 +35,12 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
     
     protected abstract byte[] getFirmwareKey(byte[] firmwareId);
     
-    protected abstract boolean needsUpdate(byte[] firmwareId);
+    protected abstract DeviceFirmware updateTarget(byte[] firmwareId);
     
-    protected abstract Firmware updateTarget(byte[] firmwareId);
+    protected boolean needsUpdate(byte[] firmwareId)
+    {
+        return this.updateTarget(firmwareId) != null;
+    }
     
     private class AbstractFirmwareContext implements FirmwareContext
     {
@@ -50,7 +54,7 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
         
         private boolean verified = false;
         
-        private Firmware target;
+        private DeviceFirmware target;
         
         private ByteBuffer chunkBuffer;
         
@@ -70,7 +74,7 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
                 if (this.firmwareKey != null)
                 {
                     // sign the challenge
-                    byte[] signature = Hash.sha256(hello.getNonce(), this.firmwareKey);
+                    byte[] signature = Hash.sha256HMAC(this.firmwareKey, hello.getNonce());
                     // generate a nonce for the device to sign
                     this.currentNonce = new byte[16];
                     BaseFirmwareEngine.this.random.nextBytes(this.currentNonce);
@@ -87,7 +91,7 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
             if (this.state == State.CHALLENGED)
             {
                 this.state = State.VERIFIED;
-                byte[] expected  = Hash.sha256(this.currentNonce, this.firmwareKey); 
+                byte[] expected  = Hash.sha256HMAC(this.firmwareKey, this.currentNonce); 
                 this.verified = Arrays.equals(expected, response.getHash());
                 return this.verified;
             }
@@ -116,11 +120,18 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
                 this.target = BaseFirmwareEngine.this.updateTarget(this.firmwareId);
                 if (this.target != null)
                 {
-                    this.chunkBuffer = ByteBuffer.wrap(this.target.getFirmware());
-                    return new FirmwareUpdateBeginMessage(this.target.getFirmware().length, this.target.getInfo(), 0x00, this.target.getMd5());
+                    this.chunkBuffer = ByteBuffer.wrap(this.target.getDeviceFirmwareImage());
+                    this.state = State.IN_PROGRESS;
+                    return new FirmwareUpdateBeginMessage(this.target.getDeviceFirmwareImage().length, this.target.getDeviceFirmwareInfo(), 0x00, this.target.getDeviceFirmwareMd5());
                 }
             }
             return null;
+        }
+        
+        @Override
+        public boolean isInProgress()
+        {
+            return this.state == State.IN_PROGRESS;
         }
 
         @Override
@@ -143,9 +154,15 @@ public abstract class BaseFirmwareEngine implements FirmwareEngine
         {
             if (this.verified && this.target != null && this.chunkBuffer != null && (! this.chunkBuffer.hasRemaining()))
             {
-                return new FirmwareUpdateFinishMessage(Hash.sha256HMAC(this.firmwareKey, this.target.getFirmware()));
+                return new FirmwareUpdateFinishMessage(Hash.sha256HMAC(this.firmwareKey, this.target.getDeviceFirmwareImage()));
             }
             return null;
+        }
+        
+        public void complete()
+        {
+            this.state = State.COMPLETE;
+            this.chunkBuffer = null;
         }
 
         @Override
