@@ -1,0 +1,18 @@
+image: docker:latest
+services:
+  - docker:dind
+
+stages:
+  - build
+
+maven-build:
+  image: maven:3-jdk-8
+  stage: build
+  script: 
+    - "mkdir $HOME/.m2"
+    - "./settings.sh > $HOME/.m2/settings.xml"
+    - "mvn clean install package publish -B"
+  artifacts:
+    paths:
+      - '*/target/*.jar'
+
