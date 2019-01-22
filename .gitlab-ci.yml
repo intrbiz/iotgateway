@@ -11,7 +11,7 @@ maven-build:
   script: 
     - "mkdir -p $HOME/.m2"
     - "./.settings.sh > $HOME/.m2/settings.xml"
-    - "mvn clean install package publish -B"
+    - "mvn clean install package deploy -B"
   artifacts:
     paths:
       - '*/target/*.jar'
