@@ -10,7 +10,7 @@ maven-build:
   stage: build
   script: 
     - "mkdir -p $HOME/.m2"
-    - "./settings.sh > $HOME/.m2/settings.xml"
+    - "./.settings.sh > $HOME/.m2/settings.xml"
     - "mvn clean install package publish -B"
   artifacts:
     paths:
