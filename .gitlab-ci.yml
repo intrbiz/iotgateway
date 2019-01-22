@@ -6,7 +6,7 @@ stages:
   - build
 
 maven-build:
-  image: maven:3-jdk-8
+  image: maven:3-jdk-11
   stage: build
   script: 
     - "mkdir -p $HOME/.m2"
