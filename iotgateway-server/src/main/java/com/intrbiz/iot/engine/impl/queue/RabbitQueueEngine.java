@@ -5,6 +5,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.log4j.Logger;
 
@@ -124,7 +125,7 @@ public class RabbitQueueEngine implements QueueEngine
             {
                 this.channel.close();
             }
-            catch (IOException e)
+            catch (IOException | TimeoutException e)
             {
                 // ignore
             }
