@@ -56,7 +56,7 @@
 			<dependency>
 				<groupId>com.intrbiz.util</groupId>
 				<artifactId>queue</artifactId>
-				<version>1.4.0</version>
+				<version>1.4.1</version>
 			</dependency>
 			<dependency>
 				<groupId>junit</groupId>
@@ -76,7 +76,7 @@
 			<dependency>
 				<groupId>com.intrbiz.util</groupId>
 				<artifactId>crypto</artifactId>
-				<version>1.4.0</version>
+				<version>1.4.1</version>
 			</dependency>
 			<dependency>
 				<groupId>com.intrbiz.iotgateway</groupId>
